@@ -373,8 +373,19 @@ void HtmlPage::conv(){
 void HtmlPage::addChar(GfxState *state, double x, double y,
 		       double dx, double dy, 
 			double ox, double oy, Unicode *u, int uLen) {
-  double x1, y1, w1, h1, dx2, dy2;
+  double x1, y1, w1, h1, dx2, dy2, sp;
   int n, i;
+
+  //copied from TextOutputDev
+  // subtract char and word spacing from the dx,dy values
+  sp = state->getCharSpace();
+
+  state->textTransformDelta(sp * state->getHorizScaling(), 0, &dx2, &dy2);
+  dx -= dx2;
+  dy -= dy2;
+  state->transformDelta(dx, dy, &w1, &h1);
+
+
   state->transform(x, y, &x1, &y1);
 
   // throw away chars that aren't inside the page bounds
