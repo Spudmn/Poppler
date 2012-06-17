@@ -165,6 +165,8 @@ public:
 
   void dump(FILE *f, int pageNum);
 
+  void InLineImagedump(FILE *f, int pageNum);
+
   // Clear the page.
   void clear();
   

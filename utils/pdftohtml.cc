@@ -75,6 +75,7 @@ GBool printCommands = gTrue;
 static GBool printHelp = gFalse;
 GBool printHtml = gFalse;
 GBool complexMode=gFalse;
+GBool inlineImages=gTrue;
 GBool singleHtml=gFalse; // singleHtml
 GBool ignore=gFalse;
 static char extension[5]="png";

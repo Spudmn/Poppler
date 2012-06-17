@@ -84,10 +84,26 @@ public:
   GooString  *fName;		// image file name
 };
 
+
+class HtmlLines
+{
+public:
+    HtmlLines(GooString *_fLine,int fTop , int fLeft)
+      : fLine(_fLine) {
+    	Top = fTop;
+    	Left = fLeft;
+  }
+ ~HtmlLines() { delete fLine; }
+
+ int Top, Left;
+ GooString  *fLine;
+};
+
 // returns true if x is closer to y than x is to z
 static inline bool IS_CLOSER(float x, float y, float z) { return fabs((x)-(y)) < fabs((x)-(z)); }
 
 extern GBool complexMode;
+extern GBool inlineImages;
 extern GBool singleHtml;
 extern GBool ignore;
 extern GBool printCommands;
@@ -936,12 +952,82 @@ void HtmlPage::dumpComplex(FILE *file, int page){
 }
 
 
+int InLineImageSort(const void *ptr1, const void *ptr2)
+{
+	HtmlLines *Line1 = *(HtmlLines**)ptr1;
+	HtmlLines *Line2 = *(HtmlLines**)ptr2;
+
+	if (Line1->Top < Line2->Top){
+		return -1;
+	} else 	if (Line1->Top > Line2->Top){
+		return +1;
+	}
+return 0;
+}
+
+void HtmlPage::InLineImagedump(FILE *f, int pageNum)
+{
+	GooList *LineList;
+	LineList = new GooList();
+	fprintf(f, "<a name=%d></a>", pageNum);
+	// Loop over the list of image names on this page
+	int listlen = imgList->getLength();
+	for (int i = 0; i < listlen; i++) {
+		HtmlImage *img = (HtmlImage*) imgList->del(0);
+
+		// see printCSS() for class names
+		const char *styles[4] = { "", " class=\"xflip\"", " class=\"yflip\"",
+				" class=\"xyflip\"" };
+		int style_index = 0;
+		if (img->xMin > img->xMax)
+			style_index += 1; // xFlip
+		if (img->yMin > img->yMax)
+			style_index += 2; // yFlip
+
+		GooString* Line_str;
+		Line_str = GooString::format("<img{0:s} src=\"{1:s}\"/><br/>\n",
+				styles[style_index], img->fName->getCString());
+		HtmlLines *Lines = new HtmlLines(Line_str, xoutRound(img->yMin),
+				xoutRound(img->xMin));
+		LineList->append(Lines);
+		delete img;
+	}
+
+	GooString* str;
+	for (HtmlString *tmp = yxStrings; tmp; tmp = tmp->yxNext) {
+		if (tmp->htext) {
+			str = new GooString(tmp->htext);
+			str->append("<br/>\n");
+			HtmlLines *Lines = new HtmlLines(str, xoutRound(tmp->yMin),
+					xoutRound(tmp->xMin));
+			LineList->append(Lines);
+		}
+	}
+
+	LineList->sort(InLineImageSort);
+
+	int Linelistlen = LineList->getLength();
+	for (int i = 0; i < Linelistlen; i++) {
+		HtmlLines *myline = (HtmlLines*) LineList->del(0);
+		fputs(myline->fLine->getCString(), f);
+		delete myline;
+	}
+
+	delete LineList;
+	fputs("<hr/>\n", f);
+
+}
+
 void HtmlPage::dump(FILE *f, int pageNum) 
 {
   if (complexMode || singleHtml)
   {
     if (xml) dumpAsXML(f, pageNum);
     if (!xml) dumpComplex(f, pageNum);  
+  }
+  else if (inlineImages)
+  {
+	InLineImagedump(f, pageNum);
   }
   else
   {
@@ -956,7 +1042,6 @@ void HtmlPage::dump(FILE *f, int pageNum)
       int style_index=0;
       if (img->xMin > img->xMax) style_index += 1; // xFlip
       if (img->yMin > img->yMax) style_index += 2; // yFlip
-
       fprintf(f,"<img%s src=\"%s\"/><br/>\n",styles[style_index],img->fName->getCString());
       delete img;
     }
@@ -966,7 +1051,7 @@ void HtmlPage::dump(FILE *f, int pageNum)
       if (tmp->htext){
 		str=new GooString(tmp->htext); 
 		fputs(str->getCString(),f);
-		delete str;      
+		delete str;
 		fputs("<br/>\n",f);
       }
     }
