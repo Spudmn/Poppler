@@ -238,7 +238,11 @@ public:
 	  char *extension,
 	  GBool rawOrder,
 	  int firstPage = 1,
-	  GBool outline = 0);
+	  GBool outline = 0,
+	  int x = 0,
+	  int y = 0,
+	  int w = 0,
+	  int h = 0 );
 
   // Destructor.
   virtual ~HtmlOutputDev();

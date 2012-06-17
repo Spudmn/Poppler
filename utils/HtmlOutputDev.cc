@@ -360,6 +360,16 @@ void HtmlPage::addChar(GfxState *state, double x, double y,
   double x1, y1, w1, h1, dx2, dy2;
   int n, i;
   state->transform(x, y, &x1, &y1);
+
+  // throw away chars that aren't inside the page bounds
+  // (and also do a sanity check on the character size)
+
+  if (x1 + w1 < 0 || x1 > pageWidth ||
+      y1 + h1 < 0 || y1 > pageHeight ||
+      w1 > pageWidth || h1 > pageHeight)  {
+    return;
+  }
+
   n = curStr->len;
  
   // check that new character is in the same direction as current string
@@ -1096,7 +1106,11 @@ void HtmlOutputDev::doFrame(int firstPage){
 HtmlOutputDev::HtmlOutputDev(Catalog *catalogA, char *fileName, char *title, 
 	char *author, char *keywords, char *subject, char *date,
 	char *extension,
-	GBool rawOrder, int firstPage, GBool outline) 
+	GBool rawOrder, int firstPage, GBool outline,
+	  int x,
+	  int y,
+	  int w,
+	  int h)
 {
   catalog = catalogA;
   fContentsFrame = NULL;
@@ -1494,9 +1508,108 @@ void HtmlOutputDev::drawImageMask(GfxState *state, Object *ref, Stream *str,
   }
 }
 
+
+
+static inline int Lower(double x)
+{
+	if (x > 0) return (int)x;
+	else return (int)floor(x);
+}
+
+static inline int Upper(double x) {
+  return Lower(x) + 1;
+}
+
+
+enum ClipResult {
+  ClipAllInside,
+  ClipAllOutside,
+  ClipPartial
+};
+
+ClipResult testRect(GfxState *state, int rectXMin, int rectYMin,
+				      int rectXMax, int rectYMax) {
+
+	double xMin,yMin,xMax,yMax;
+
+	state->getClipBBox(&xMin,&yMin,&xMax,&yMax);
+
+  // This tests the rectangle:
+  //     x = [rectXMin, rectXMax + 1)    (note: rect coords are ints)
+  //     y = [rectYMin, rectYMax + 1)
+  // against the clipping region:
+  //     x = [xMin, xMax)                (note: clipping coords are fp)
+  //     y = [yMin, yMax)
+  if ((double)(rectXMax + 1) <= xMin || (double)rectXMin >= xMax ||
+      (double)(rectYMax + 1) <= yMin || (double)rectYMin >= yMax) {
+	  //printf("all outside\n");
+    return ClipAllOutside;
+  }
+  if ((double)rectXMin >= xMin && (double)(rectXMax + 1) <= xMax &&
+      (double)rectYMin >= yMin && (double)(rectYMax + 1) <= yMax //&&
+      //length == 0  todo do I need this
+      ) {
+	  //printf("all inside\n");
+    return ClipAllInside;
+  }
+  //printf("Clip Partial\n");
+  return ClipPartial;
+}
+
+
+
 void HtmlOutputDev::drawImage(GfxState *state, Object *ref, Stream *str,
 			      int width, int height, GfxImageColorMap *colorMap,
 			      GBool interpolate, int *maskColors, GBool inlineImg) {
+
+
+	double *ctm;
+	double mat[6];
+	int  i;
+	GBool minorAxisZero;
+	int x0, y0, x1, y1;
+	ClipResult clipRes;
+	double clipXMin,clipYMin,clipXMax,clipYMax;
+
+	ctm = state->getCTM();
+	  for (i = 0; i < 6; ++i) {
+	    if (!isfinite(ctm[i])) return;
+	  }
+	  mat[0] = ctm[0];
+	  mat[1] = ctm[1];
+	  mat[2] = -ctm[2];
+	  mat[3] = -ctm[3];
+	  mat[4] = ctm[2] + ctm[4];
+	  mat[5] = ctm[3] + ctm[5];
+
+	  minorAxisZero = mat[1] == 0 && mat[2] == 0;
+
+	  // scaling only
+	  if (mat[0] > 0 && minorAxisZero && mat[3] > 0) {
+	    x0 = Lower(mat[4]);
+	    y0 = Lower(mat[5]);
+	    x1 = Upper(mat[0] + mat[4]);
+	    y1 = Upper(mat[3] + mat[5]);
+	    // make sure narrow images cover at least one pixel
+	    if (x0 == x1) {
+	      ++x1;
+	    }
+	    if (y0 == y1) {
+	      ++y1;
+	    }
+
+	    state->getClipBBox(&clipXMin,&clipYMin,&clipXMax,&clipYMax);
+
+	    clipRes = testRect(state,x0, y0, x1 - 1, y1 - 1);
+
+	    if ( clipRes == ClipAllOutside)  {  //Ditch image
+	        OutputDev::drawImage(state, ref, str, width, height, colorMap, interpolate,
+	    			 maskColors, inlineImg);
+	        return;
+	    }
+	  }
+
+	  //todo: else
 
   if (ignore||(complexMode && !xml)) {
     OutputDev::drawImage(state, ref, str, width, height, colorMap, interpolate,

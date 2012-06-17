@@ -65,6 +65,11 @@
 
 static int firstPage = 1;
 static int lastPage = 0;
+static int Crop_x = 0;
+static int Crop_y = 0;
+static int Crop_w = 0;
+static int Crop_h = 0;
+
 static GBool rawOrder = gTrue;
 GBool printCommands = gTrue;
 static GBool printHelp = gFalse;
@@ -100,6 +105,14 @@ static const ArgDesc argDesc[] = {
    "last page to convert"},
   /*{"-raw",    argFlag,     &rawOrder,      0,
     "keep strings in content stream order"},*/
+   {"-x",      argInt,      &Crop_x,             0,
+    "x-coordinate of the crop area top left corner"},
+   {"-y",      argInt,      &Crop_y,             0,
+    "y-coordinate of the crop area top left corner"},
+   {"-W",      argInt,      &Crop_w,             0,
+    "width of crop area in pixels (default is 0)"},
+   {"-H",      argInt,      &Crop_h,             0,
+    "height of crop area in pixels (default is 0)"},
   {"-q",      argFlag,     &errQuiet,      0,
    "don't print any messages or errors"},
   {"-h",      argFlag,     &printHelp,     0,
@@ -357,7 +370,12 @@ int main(int argc, char *argv[]) {
 	  extension,
 	  rawOrder, 
 	  firstPage,
-	  doOutline);
+	  doOutline,
+	  Crop_x,
+	  Crop_y,
+	  Crop_w,
+	  Crop_h);
+
   delete docTitle;
   if( author )
   {   
@@ -378,9 +396,17 @@ int main(int argc, char *argv[]) {
 
   if (htmlOut->isOk())
   {
-    doc->displayPages(htmlOut, firstPage, lastPage, 72 * scale, 72 * scale, 0,
+	 if ((Crop_w==0) && (Crop_h==0) && (Crop_x==0) && (Crop_y==0)) {
+	  doc->displayPages(htmlOut, firstPage, lastPage, 72 * scale, 72 * scale, 0,
 		      gTrue, gFalse, gFalse);
-    htmlOut->dumpDocOutline(doc);
+   	} else {
+   	for (int page = firstPage; page <= lastPage; ++page) {
+	  doc->displayPageSlice(htmlOut, page, 72 * scale, 72 * scale, 0,
+		      gTrue, gFalse, gFalse, 
+		      Crop_x, Crop_y, Crop_w, Crop_h);
+   	}
+  }
+  htmlOut->dumpDocOutline(doc);
   }
   
   if ((complexMode || singleHtml) && !xml && !ignore) {
@@ -397,9 +423,19 @@ int main(int argc, char *argv[]) {
     splashOut->startDoc(doc);
 
     for (int pg = firstPage; pg <= lastPage; ++pg) {
-      doc->displayPage(splashOut, pg,
+    	if ((Crop_w==0) && (Crop_h==0) && (Crop_x==0) && (Crop_y==0)) {
+    		doc->displayPage(splashOut, pg,
                        72 * scale, 72 * scale,
                        0, gTrue, gFalse, gFalse);
+    	} else	{
+    		doc->displayPageSlice(splashOut, pg,
+    				   72 * scale, 72 * scale,
+    		           0, gTrue, gFalse, gFalse,
+    		           Crop_x, Crop_y, Crop_w, Crop_h);
+    	}
+
+
+
       SplashBitmap *bitmap = splashOut->getBitmap();
 
       imgFileName = GooString::format("{0:s}{1:03d}.{2:s}", 
