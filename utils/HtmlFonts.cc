@@ -256,6 +256,8 @@ GooString* HtmlFont::HtmlFilter(Unicode* u, int uLen) {
 	case '&': tmp->append("&amp;");  break;
 	case '<': tmp->append("&lt;");  break;
 	case '>': tmp->append("&gt;");  break;
+	case 176: tmp->append("&deg;");  break;
+	case 956: tmp->append("&micro;");  break;
 	case ' ': tmp->append( !xml && ( i+1 >= uLen || !tmp->getLength() || tmp->getChar( tmp->getLength()-1 ) == ' ' ) ? "&#160;" : " " );
 	          break;
 	default:  
